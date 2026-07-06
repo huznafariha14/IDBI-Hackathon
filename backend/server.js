@@ -23,14 +23,25 @@ app.use((req, res, next) => {
 });
 
 // Configure CORS
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  // Allow Vercel preview & production deployments
+  /^https:\/\/.*\.vercel\.app$/,
+  process.env.FRONTEND_URL // set in Vercel env vars
+].filter(Boolean);
+
 const corsOptions = {
-  // Allow requests from localhost only
-  origin: [
-    'http://localhost:5173',
-    'http://127.0.0.1:5173',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000'
-  ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    const allowed = allowedOrigins.some(o =>
+      o instanceof RegExp ? o.test(origin) : o === origin
+    );
+    allowed ? callback(null, true) : callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
@@ -75,10 +86,11 @@ async function startServer() {
     // 2. Initialize Redis session
     await initializeRedis();
 
-    // 3. Bind server to localhost (127.0.0.1) as required by security guidelines
-    app.listen(PORT, '127.0.0.1', () => {
+    // Bind to 0.0.0.0 to support cloud deployments (Vercel, Render, etc.)
+    const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1';
+    app.listen(PORT, HOST, () => {
       console.log(`=======================================================`);
-      console.log(`  WealthAvatar Backend API running on http://127.0.0.1:${PORT}`);
+      console.log(`  WealthAvatar Backend API running on http://${HOST}:${PORT}`);
       console.log(`=======================================================`);
     });
   } catch (error) {
